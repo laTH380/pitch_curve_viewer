@@ -38,9 +38,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-        withData: true,
-        type: FileType.custom,
-        allowedExtensions: ['mp3']);
+        withData: true, type: FileType.custom, allowedExtensions: ['mp3']);
     if (result != null && result.files.single.path != null) {
       File file = File(result.files.single.path!);
       int filesize = result.files.single.size;
@@ -101,6 +99,19 @@ class _MyHomePageState extends State<MyHomePage> {
         _result_json = result_json;
         _processing = false;
       });
+    } else {
+      showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+                title: Text('Error'),
+                content: Text('failed pick file'),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('OK'),
+                  ),
+                ],
+              ));
     }
   }
 
@@ -148,7 +159,7 @@ class _MyHomePageState extends State<MyHomePage> {
     List<String> data_list = data_str.split(",");
     List<FlSpot> pitchdata = [];
     data_list.asMap().forEach((index, value) {
-      double time = index.toDouble() * (1/26000);
+      double time = index.toDouble() * (1 / 26000);
       double pitch = double.parse(value);
       FlSpot spot = FlSpot(time, pitch);
       pitchdata.add(spot);
@@ -195,12 +206,15 @@ class _MyHomePageState extends State<MyHomePage> {
                               )
                             ],
                             titlesData: FlTitlesData(
-                              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                              topTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              rightTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
                               // leftTitles: AxisTitles(),
                               bottomTitles: AxisTitles(
                                 sideTitles: SideTitles(
-                                  getTitlesWidget: (value, meta) => Text('${value.toInt().toString()}.00'),
+                                  getTitlesWidget: (value, meta) =>
+                                      Text('${value.toInt().toString()}.00'),
                                   showTitles: true,
                                   interval: 1,
                                 ),
