@@ -38,7 +38,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-        // withData: true,
+        withData: true,
         type: FileType.custom,
         allowedExtensions: ['mp3']);
     if (result != null && result.files.single.path != null) {
