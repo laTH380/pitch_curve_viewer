@@ -106,7 +106,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // mp3データをバックエンドを送信して結果を受け取る
   Future<Map<String, dynamic>?> _analyzePitch() async {
-    final uri = Uri.parse('http://127.0.0.1:5000/process');
+    final uri = Uri.parse('https://pitchcurveviewer.azurewebsites.net/process');
     final request = http.MultipartRequest('POST', uri);
     request.headers.addAll({
       'Content-Type': 'multipart/form-data',
