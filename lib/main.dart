@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:io';
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
@@ -39,11 +38,16 @@ class _MyHomePageState extends State<MyHomePage> {
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
         withData: true, type: FileType.custom, allowedExtensions: ['mp3']);
-    if (result != null && result.files.single.path != null) {
-      File file = File(result.files.single.path!);
-      int filesize = result.files.single.size;
+    if (result != null) {
+      PlatformFile file = result.files.single;
+      final fileBytes = result.files.first.bytes;
+      final fileName = result.files.first.name;
+      int filesize = file.size;
+      make_dialog("debug", fileName);
+      make_dialog("debug", filesize.toString());
+      return;
       // 拡張子が.mp3であるかを確認
-      if (!file.path.toLowerCase().endsWith('.mp3')) {
+      if (fileName.toLowerCase().endsWith('.mp3')) {
         // .mp3でない場合はエラーメッセージを表示して終了
         showDialog(
           context: context,
@@ -168,6 +172,22 @@ class _MyHomePageState extends State<MyHomePage> {
       _pitchData = pitchdata;
     });
     return;
+  }
+
+  void make_dialog(title, content) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
