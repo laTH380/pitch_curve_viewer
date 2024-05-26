@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:typed_data';
+import 'package:dio/dio.dart';
 
 void main() {
   runApp(MyApp());
@@ -30,7 +31,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String? _filePath;
+  String? _filename;
   bool _processing = false;
   Map<String, dynamic>? _result_json;
   List<FlSpot> _pitchData = [];
@@ -39,127 +40,84 @@ class _MyHomePageState extends State<MyHomePage> {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
         withData: true, type: FileType.custom, allowedExtensions: ['mp3']);
     if (result != null) {
-      PlatformFile file = result.files.single;
-      final fileBytes = result.files.first.bytes;
-      final fileName = result.files.first.name;
-      int filesize = file.size;
-      make_dialog("debug", fileName);
-      make_dialog("debug", filesize.toString());
-      return;
-      // 拡張子が.mp3であるかを確認
-      if (fileName.toLowerCase().endsWith('.mp3')) {
-        // .mp3でない場合はエラーメッセージを表示して終了
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Error'),
-            content: Text('Selected file must be in .mp3 format.'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('OK'),
-              ),
-            ],
-          ),
-        );
-        return;
-      }
-      // 音声ファイルが1MB以下であることを確認
-      if (filesize != null) {
-        if (filesize > 1048576) {
-          // 1MB秒以上の場合はエラーメッセージを表示して終了
-          print('Debug message: Hello, world!' + filesize.toString());
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text('Error'),
-              content: Text('Selected audio file must be 1MB or less.'),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('OK'),
-                ),
-              ],
-            ),
-          );
+      if (result.files.single.bytes != null) {
+        PlatformFile file = result.files.single;
+        Uint8List fileBytes = file.bytes!;
+        final filename = file.name;
+        int filesize = file.size;
+        // 拡張子が.mp3であるかを確認
+        if (!filename.toLowerCase().endsWith('.mp3')) {
+          // .mp3でない場合はエラーメッセージを表示して終了
+          make_dialog("Error", "mp3ファイルを選択してください");
           return;
         }
-      } else {
-        return;
-      }
-      setState(() {
-        _filePath = file.path;
-        _processing = true;
-      });
-      Map<String, dynamic>? result_json = await _analyzePitch();
-      if (result_json == null) {
+        // 音声ファイルが1MB以下であることを確認
+        if (filesize > 1048576) {
+          // 1MB秒以上の場合はエラーメッセージを表示して終了
+          make_dialog("Error", "1MB以下のファイルを選択してください");
+          return;
+        }
         setState(() {
+          _filename = filename;
+          _processing = true;
+        });
+        Map<String, dynamic>? result_json = await _analyzePitch(fileBytes);
+        if (result_json == null || result_json["error"] != null) {
+          make_dialog("Error", "サーバでの処理に失敗しました");
+          setState(() {
+            _processing = false;
+          });
+          return;
+        }
+        make_graph_data(result_json);
+        setState(() {
+          _result_json = result_json;
           _processing = false;
         });
-        return;
+      } else {
+        make_dialog("Error", "ファイルのアップロードに失敗しました");
       }
-      make_graph_data(result_json);
-      setState(() {
-        _result_json = result_json;
-        _processing = false;
-      });
     } else {
-      showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-                title: Text('Error'),
-                content: Text('failed pick file'),
-                actions: <Widget>[
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('OK'),
-                  ),
-                ],
-              ));
+      make_dialog("Error", "ファイルのアップロードに失敗しました");
     }
   }
 
   // mp3データをバックエンドを送信して結果を受け取る
-  Future<Map<String, dynamic>?> _analyzePitch() async {
-    final uri = Uri.parse('http://127.0.0.1:5000/process');
-    final request = http.MultipartRequest('POST', uri);
-    request.headers.addAll({
-      'Content-Type': 'multipart/form-data',
-    });
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'file', // サーバー側でファイルを受け取るフィールド名
-        _filePath!, // アップロードするファイルのパス
-        contentType: MediaType('audio', 'mpeg'), // ファイルのコンテンツタイプ
-      ),
-    );
-    final streamedResponse = await request.send(); //送信して待機
-    final response = await http.Response.fromStream(streamedResponse);
+  Future<Map<String, dynamic>?> _analyzePitch(Uint8List filebytes) async {
+    // try{
+      final dio = Dio();
+      final uri = 'http://127.0.0.1:5000/process';
 
-    if (response.statusCode == 200) {
-      //通信が成功したときが200
-      return Future.value(jsonDecode(response.body));
-    } else {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Error'),
-          content: Text('sever error'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('OK'),
-            ),
-          ],
+      FormData formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          filebytes,
+          filename: 'audio.mpeg',
+          contentType: MediaType('audio', 'mpeg'),
         ),
-      );
-      return null;
-    }
+      });
+
+      final response = await dio.post(uri, data: formData);
+
+      if (response.statusCode == 200) {
+        //通信が成功したときが200
+        return Future.value(response.data);
+      } else {
+        return null;
+      }
+    // } catch (e) {
+    //   make_dialog("Error", e.toString());
+    //   return null;
+    // }
   }
 
   //返されたjsonからグラフデータを作成し保存
-  void make_graph_data(result_json) async {
-    String data_str = result_json!["result"];
+  void make_graph_data(Map<String, dynamic> result_json) async {
+    result_json.forEach((key, value) {
+      print('debug: $key: $value');
+      // valueの型を確認する
+      print('Value type: ${value.runtimeType}');
+    });
+    String data_str = result_json['result'];
     List<String> data_list = data_str.split(",");
     List<FlSpot> pitchdata = [];
     data_list.asMap().forEach((index, value) {
@@ -205,8 +163,8 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Text('Upload Audio File'),
             ),
             SizedBox(height: 20),
-            _filePath != null
-                ? Text('File: $_filePath')
+            _filename != null
+                ? Text('File: $_filename')
                 : Text('No file selected.'),
             SizedBox(height: 20),
             _processing == true
