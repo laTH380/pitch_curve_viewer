@@ -37,7 +37,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _filename;
   bool _processing = false;
   Map<String, dynamic>? _result_json;
-  List<FlSpot> _pitchData = [];
+  List<dynamic> _pitchData = []; //FLspotデータの配列が入った配列
 
   void _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -118,20 +118,24 @@ class _MyHomePageState extends State<MyHomePage> {
   //返されたjsonからグラフデータを作成し保存
   void make_graph_data(Map<String, dynamic> result_json) async {
     print("debug make_graph_data");
-    String data_str = result_json['result'];
-    List<String> data_list = data_str.split(",");
+    String f0_str = result_json['result'];
+    List<String> f0_list = f0_str.split(",");
     String times_str = result_json['times'];
     List<String> times_list = times_str.split(",");
-    List<FlSpot> pitchdata = [];
-    data_list.asMap().forEach((index, value) {
-      if (value != "nan" && value != " nan") {
+    List<dynamic> pitchdata = [];
+    List<FlSpot> f0_part = [];
+    f0_list.asMap().forEach((index, value) {
+      if (value == "nan" || value == " nan") {
+        pitchdata.add(f0_part);
+        f0_part = [];
+      } else {
         double time = double.parse(times_list[index]);
         double pitch = log(double.parse(value)) / log(2);
-        // print("pitch $pitch");
         FlSpot spot = FlSpot(time, pitch);
-        pitchdata.add(spot);
+        f0_part.add(spot);
       }
     });
+    pitchdata.add(f0_part);
     setState(() {
       _pitchData = pitchdata;
     });
@@ -157,99 +161,148 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Flutter Audio Pitch Analyzer'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: _pickFile,
-              child: Text('Upload Audio File'),
+        appBar: AppBar(
+            title: Text('ピッチカーブビューワー'), backgroundColor: Colors.blue[300]),
+        body: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              if (MediaQuery.of(context).size.height < 800) {
+                print("bbbbbb");
+                return InteractiveViewer(
+                  constrained: false,
+                  child: _buildContent(),
+                );
+              } else {
+                // コンテンツの高さが画面サイズに収まる場合はスクロールなし
+                print("aaaaa");
+                return _buildContent();
+              }
+            }
+        )
+    );
+  }
+
+  Widget _buildContent() {
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Center(
+            child: Column(children: [
+              SizedBox(height: 20),
+              Text('音声データのピッチカーブを表示します。　調声の時カタチをまねすれば同じような発音になる...かも?\n',
+                  textAlign: TextAlign.center),
+              Text('対応ファイル：1MB以下の.mp3ファイル\n',
+                  textAlign: TextAlign.center) //,style: TextStyle(fontSize: 12)
+            ]),
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  ElevatedButton(
+                    onPressed: _pickFile,
+                    child: Text('Upload Audio File'),
+                  ),
+                  SizedBox(height: 20),
+                  _filename != null
+                      ? Text('File: $_filename')
+                      : Text('No file selected.'),
+                  SizedBox(height: 20),
+                  _processing == true
+                      ? CircularProgressIndicator()
+                      : _pitchData.isNotEmpty
+                          ? Container(
+                              height: 700,
+                              padding: EdgeInsets.all(16),
+                              child: LineChart(
+                                LineChartData(
+                                  minY: 6,
+                                  maxY: 10,
+                                  lineBarsData:
+                                      List.generate(_pitchData.length, (index) {
+                                    print(_pitchData.length);
+                                    return LineChartBarData(
+                                      spots: _pitchData[index],
+                                      isCurved: true,
+                                      color: Colors.blue,
+                                      barWidth: 2,
+                                    );
+                                  }),
+                                  gridData: FlGridData(
+                                    // 背景のグリッド線の設定
+                                    horizontalInterval: 1.0,
+                                    verticalInterval: 0.1,
+                                  ),
+                                  lineTouchData: LineTouchData(
+                                    // タッチ操作時の設定
+                                    touchTooltipData: LineTouchTooltipData(
+                                        getTooltipColor: (color) {
+                                      return Color(0xFF42A5F5);
+                                    }, //塗りつぶしの色
+                                        getTooltipItems: (touchedSpots) {
+                                      //ツールチップのテキスト情報設定
+                                      return touchedSpots.map((touchedSpot) {
+                                        return LineTooltipItem(
+                                            ((pow(2, touchedSpot.y) * 100)
+                                                            .floor() /
+                                                        100)
+                                                    .toString() +
+                                                " Hz",
+                                            TextStyle());
+                                      }).toList();
+                                    }),
+                                  ),
+                                  titlesData: FlTitlesData(
+                                    topTitles: AxisTitles(
+                                        sideTitles:
+                                            SideTitles(showTitles: false)),
+                                    rightTitles: AxisTitles(
+                                        sideTitles:
+                                            SideTitles(showTitles: false)),
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        getTitlesWidget: (value, meta) {
+                                          String text;
+                                          if (value == 10) {
+                                            text =
+                                                '${pow(2, value).toString()} Hz';
+                                          } else if (value == 6 ||
+                                              value == 7 ||
+                                              value == 8 ||
+                                              value == 9) {
+                                            text = pow(2, value).toString();
+                                          } else {
+                                            text = '';
+                                          }
+                                          return Text(text);
+                                        },
+                                        showTitles: true,
+                                        interval: 1,
+                                        reservedSize: 40.0,
+                                      ),
+                                    ),
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        getTitlesWidget: (value, meta) => Text(
+                                            '${((value * 100).floor() / 100).toString()}'),
+                                        showTitles: true,
+                                        interval: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Text('No pitch data available.'),
+                ],
+              ),
             ),
-            SizedBox(height: 20),
-            _filename != null
-                ? Text('File: $_filename')
-                : Text('No file selected.'),
-            SizedBox(height: 20),
-            _processing == true
-                ? CircularProgressIndicator()
-                : _pitchData.isNotEmpty
-                    ? Container(
-                        height: 300,
-                        padding: EdgeInsets.all(16),
-                        child: LineChart(
-                          LineChartData(
-                            minY: 6,
-                            maxY: 10,
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: _pitchData,
-                                isCurved: true,
-                                color: Colors.blue,
-                                barWidth: 2,
-                              )
-                            ],
-                            gridData: FlGridData(
-                              // 背景のグリッド線の設定
-                              horizontalInterval: 1.0,
-                              verticalInterval: 0.1,
-                            ),
-                            lineTouchData: LineTouchData(
-                              // タッチ操作時の設定
-                              touchTooltipData: LineTouchTooltipData(
-                                getTooltipItems: (touchedSpots) {
-                                  return touchedSpots.map((touchedSpot) {
-                                    return LineTooltipItem(
-                                        ((pow(2, touchedSpot.y) * 100).floor() / 100).toString() + " Hz",
-                                        TextStyle());
-                                  }).toList();
-                                }
-                              ),
-                            ),
-                            titlesData: FlTitlesData(
-                              topTitles: AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false)),
-                              rightTitles: AxisTitles(
-                                  sideTitles: SideTitles(showTitles: false)),
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  getTitlesWidget: (value, meta) {
-                                    String text;
-                                    if (value == 10) {
-                                      text = '${pow(2, value).toString()} Hz';
-                                    } else if (value == 6 ||
-                                        value == 7 ||
-                                        value == 8 ||
-                                        value == 9) {
-                                      text = pow(2, value).toString();
-                                    } else {
-                                      text = '';
-                                    }
-                                    return Text(text);
-                                  },
-                                  showTitles: true,
-                                  interval: 1,
-                                  reservedSize: 40.0,
-                                ),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  getTitlesWidget: (value, meta) => Text(
-                                      '${((value * 100).floor() / 100).toString()}'),
-                                  showTitles: true,
-                                  interval: 0.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    : Text('No pitch data available.'),
-          ],
-        ),
-      ),
+          ),
+          SelectableText(
+            '© 2024 laTH　contact→https://lath-memorandum.netlify.app/profiel',
+            textAlign: TextAlign.center //,style: TextStyle(fontSize: 12)
+          )
+        ]
     );
   }
 }
