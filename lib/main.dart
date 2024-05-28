@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
@@ -7,6 +9,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'dart:math';
 
 void main() {
   runApp(MyApp());
@@ -84,10 +87,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   // mp3データをバックエンドを送信して結果を受け取る
   Future<Map<String, dynamic>?> _analyzePitch(Uint8List filebytes) async {
-    // try{
+    try {
       final dio = Dio();
       final uri = 'http://127.0.0.1:5000/process';
-
       FormData formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(
           filebytes,
@@ -100,31 +102,35 @@ class _MyHomePageState extends State<MyHomePage> {
 
       if (response.statusCode == 200) {
         //通信が成功したときが200
+        print("debug make_graph_data");
         return Future.value(response.data);
       } else {
+        print("debug make_graph_data");
         return null;
       }
-    // } catch (e) {
-    //   make_dialog("Error", e.toString());
-    //   return null;
-    // }
+    } catch (e) {
+      print("debug $e");
+      make_dialog("Error", e.toString());
+      return null;
+    }
   }
 
   //返されたjsonからグラフデータを作成し保存
   void make_graph_data(Map<String, dynamic> result_json) async {
-    result_json.forEach((key, value) {
-      print('debug: $key: $value');
-      // valueの型を確認する
-      print('Value type: ${value.runtimeType}');
-    });
+    print("debug make_graph_data");
     String data_str = result_json['result'];
     List<String> data_list = data_str.split(",");
+    String times_str = result_json['times'];
+    List<String> times_list = times_str.split(",");
     List<FlSpot> pitchdata = [];
     data_list.asMap().forEach((index, value) {
-      double time = index.toDouble() * (1 / 26000);
-      double pitch = double.parse(value);
-      FlSpot spot = FlSpot(time, pitch);
-      pitchdata.add(spot);
+      if (value != "nan" && value != " nan") {
+        double time = double.parse(times_list[index]);
+        double pitch = log(double.parse(value)) / log(2);
+        // print("pitch $pitch");
+        FlSpot spot = FlSpot(time, pitch);
+        pitchdata.add(spot);
+      }
     });
     setState(() {
       _pitchData = pitchdata;
@@ -175,6 +181,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         padding: EdgeInsets.all(16),
                         child: LineChart(
                           LineChartData(
+                            minY: 6,
+                            maxY: 10,
                             lineBarsData: [
                               LineChartBarData(
                                 spots: _pitchData,
@@ -183,18 +191,55 @@ class _MyHomePageState extends State<MyHomePage> {
                                 barWidth: 2,
                               )
                             ],
+                            gridData: FlGridData(
+                              // 背景のグリッド線の設定
+                              horizontalInterval: 1.0,
+                              verticalInterval: 0.1,
+                            ),
+                            lineTouchData: LineTouchData(
+                              // タッチ操作時の設定
+                              touchTooltipData: LineTouchTooltipData(
+                                getTooltipItems: (touchedSpots) {
+                                  return touchedSpots.map((touchedSpot) {
+                                    return LineTooltipItem(
+                                        ((pow(2, touchedSpot.y) * 100).floor() / 100).toString() + " Hz",
+                                        TextStyle());
+                                  }).toList();
+                                }
+                              ),
+                            ),
                             titlesData: FlTitlesData(
                               topTitles: AxisTitles(
                                   sideTitles: SideTitles(showTitles: false)),
                               rightTitles: AxisTitles(
                                   sideTitles: SideTitles(showTitles: false)),
-                              // leftTitles: AxisTitles(),
-                              bottomTitles: AxisTitles(
+                              leftTitles: AxisTitles(
                                 sideTitles: SideTitles(
-                                  getTitlesWidget: (value, meta) =>
-                                      Text('${value.toInt().toString()}.00'),
+                                  getTitlesWidget: (value, meta) {
+                                    String text;
+                                    if (value == 10) {
+                                      text = '${pow(2, value).toString()} Hz';
+                                    } else if (value == 6 ||
+                                        value == 7 ||
+                                        value == 8 ||
+                                        value == 9) {
+                                      text = pow(2, value).toString();
+                                    } else {
+                                      text = '';
+                                    }
+                                    return Text(text);
+                                  },
                                   showTitles: true,
                                   interval: 1,
+                                  reservedSize: 40.0,
+                                ),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  getTitlesWidget: (value, meta) => Text(
+                                      '${((value * 100).floor() / 100).toString()}'),
+                                  showTitles: true,
+                                  interval: 0.5,
                                 ),
                               ),
                             ),
