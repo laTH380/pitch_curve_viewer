@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Audio Pitch Analyzer',
+      title: 'Pitch Curve Viewer',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -151,7 +151,7 @@ class _MyHomePageState extends State<MyHomePage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
-        content: Text(content),
+        content: SelectableText(content),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -166,7 +166,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-            title: Text('ピッチカーブビューワー'), backgroundColor: Colors.blue[300]),
+            title: Text('ピッチカーブビューアー'), backgroundColor: Colors.blue[300]),
         body: LayoutBuilder(
             builder: (BuildContext context, BoxConstraints constraints) {
           if (MediaQuery.of(context).size.height < 20000) {
@@ -185,10 +185,14 @@ class _MyHomePageState extends State<MyHomePage> {
         children: <Widget>[
           const Center(
             child: Column(children: [
-              SizedBox(height: 20),
-              Text('音声データのピッチカーブを表示します。　調声の時カタチをまねすれば同じような発音になる...かも?\n',
+              SizedBox(height: 10),
+              SelectableText('音声データのピッチカーブを表示します。　調声の時カタチをまねすれば同じような発音になる...かも?',
                   textAlign: TextAlign.center),
-              Text('対応ファイル：1MB以下の.mp3ファイル\n',
+              SizedBox(height: 10),
+              SelectableText('Q：mp3以外も対応して　→　A：こちらのサイトで変換してもらってください　https://convertio.co/ja/wav-mp3/',
+                textAlign: TextAlign.center),
+              SizedBox(height: 20),
+              SelectableText('対応ファイル：1MB以下の.mp3ファイル',
                   textAlign: TextAlign.center) //,style: TextStyle(fontSize: 12)
             ]),
           ),
