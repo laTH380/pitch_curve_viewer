@@ -91,7 +91,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<Map<String, dynamic>?> _analyzePitch(Uint8List filebytes) async {
     try {
       final dio = Dio();
-      final uri = 'http://127.0.0.1:5000/process';
+      final uri = 'https://pitchcurveviewer.azurewebsites.net/process';
       FormData formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(
           filebytes,
