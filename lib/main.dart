@@ -13,8 +13,8 @@ class AppConstants {
 
   // デプロイ環境とローカル環境の切り替え用
   // ローカルテスト時は下記のコメントアウトを入れ替えてください
-  // static const String backendUrl = 'https://pitchcurveviewer.azurewebsites.net/process';
-  static const String backendUrl = 'http://localhost:5000/process';
+  static const String backendUrl = 'https://pitchcurveviewer.azurewebsites.net/process';
+  // static const String backendUrl = 'http://localhost:5000/process';
 
   static const int maxFileSizeMB = 10;
   static const int maxFileSizeBytes = 10485760; // 10MB
